@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1016">
+  <title>Phone Checker</title>
+  <link rel="stylesheet" href="styles.css?v=11">
+  <script src="app.js?v=13" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Phone Checker home">
+        <span class="brand-mark">✓</span>
+        <span>Phone<span class="brand-light"> Checker</span></span>
+      </a>
+
+      <p class="nav-label">WORKSPACE</p>
+      <nav class="navigation" aria-label="Main navigation">
+        <a class="nav-item active" href="#overview"><span class="nav-icon">◫</span> Overview</a>
+        <a class="nav-item" href="#terminal"><span class="nav-icon">&gt;_</span> Terminal</a>
+        <a class="nav-item" href="#phone-data"><span class="nav-icon">▦</span> Phone data</a>
+        <a class="nav-item" href="#recommendations"><span class="nav-icon">✳</span> Recommendations</a>
+        <a class="nav-item" href="#care"><span class="nav-icon">♡</span> Care guide</a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="profile">
+          <div class="avatar">D</div>
+          <div><strong>Demo device</strong><p>Local preview</p></div>
+          <span class="more">···</span>
+        </div>
+      </div>
+    </aside>
+
+    <main id="overview">
+      <header class="topbar">
+        <div class="breadcrumbs">Workspace <span>/</span> Overview</div>
+        <div class="top-actions">
+          <span class="demo-pill"><span></span> LOCAL USB CHECK</span>
+          <button class="icon-button settings-button" id="settings-button" aria-label="Open settings" title="Settings">⚙</button>
+        </div>
+      </header>
+
+      <section class="welcome">
+        <div>
+          <p class="eyebrow">YOUR DEVICE, AT A GLANCE</p>
+          <h1>A little care goes a long way.</h1>
+          <p class="welcome-copy">Simple, safe ways to keep your phone feeling its best.</p>
+        </div>
+      </section>
+
+      <section class="device-card" aria-label="Phone status">
+        <div class="device-heading">
+          <div class="device-title">
+            <div class="phone-icon">▯</div>
+              <div><h2 id="phone-name">My phone</h2><p id="phone-subtitle">Demo metrics · Check USB devices for live Android info</p></div>
+          </div>
+          <span class="status-label"><span></span><span id="connection-status">Demo status</span></span>
+        </div>
+        <div class="metrics">
+          <article class="metric">
+            <div class="metric-top"><span>Battery</span><span class="metric-icon battery-icon">▰</span></div>
+            <div class="metric-value"><span id="battery-reading">78</span><span>%</span></div>
+            <div class="meter"><span class="battery-meter" id="battery-meter"></span></div>
+            <p class="metric-caption" id="battery-caption">Demo value · Check ADB for live data</p>
+          </article>
+          <article class="metric">
+            <div class="metric-top"><span>Storage</span><span class="metric-icon storage-icon">▤</span></div>
+            <div class="metric-value"><span id="storage-used">64</span><span class="unit"> / <span id="storage-total">128</span> GB</span></div>
+            <div class="meter"><span class="storage-meter" id="storage-meter"></span></div>
+            <p class="metric-caption" id="storage-caption">Demo value · Check ADB for live data</p>
+          </article>
+          <article class="metric">
+            <div class="metric-top"><span>Temperature</span><span class="metric-icon temp-icon">♨</span></div>
+            <div class="metric-value"><span id="temperature-reading">31</span><span>°C</span></div>
+            <div class="metric-status"><span></span> <span id="temperature-status">Demo reading</span></div>
+            <p class="metric-caption" id="temperature-caption">Check ADB for live battery temperature</p>
+          </article>
+          <article class="metric">
+            <div class="metric-top"><span>Power profile</span><span class="metric-icon profile-icon">◉</span></div>
+            <label class="select-wrap">
+              <select id="profile-select" aria-label="Choose a recommended profile">
+                <option value="Balanced">Balanced</option>
+                <option value="Battery saver">Battery saver</option>
+              </select>
+            </label>
+            <button class="profile-apply-button" id="profile-apply-button" disabled>Apply to phone</button>
+            <p class="metric-caption" id="profile-caption">Connect an authorized phone to change its power mode</p>
+            <p class="power-note">USB connection works without PC Wi‑Fi.</p>
+          </article>
+        </div>
+        <p class="device-footnote" id="device-footnote"><span>ⓘ</span> Values are samples until an authorized Android phone is checked over ADB. Fastboot provides bootloader details only.</p>
+      </section>
+
+      <section class="usb-card" aria-labelledby="usb-title">
+        <div class="usb-heading">
+          <div class="usb-title">
+            <div class="usb-icon">↔</div>
+            <div><h2 id="usb-title">USB device detection</h2><p>Check connected Android devices using local Android Platform Tools.</p></div>
+          </div>
+          <button class="primary-button usb-button" id="usb-check-button"><span>⌕</span> Check USB devices</button>
+        </div>
+        <p class="usb-message" id="usb-message" role="status" aria-live="polite">Connect a device, then check for ADB or Fastboot.</p>
+        <div class="usb-tools">
+          <article class="usb-tool" id="adb-result">
+            <div class="usb-tool-heading"><span class="tool-dot"></span><h3>ADB</h3><span class="tool-state">Not checked</span></div>
+            <p>Android Debug Bridge · Android running with USB debugging enabled</p>
+            <ul class="device-list"></ul>
+          </article>
+          <article class="usb-tool" id="fastboot-result">
+            <div class="usb-tool-heading"><span class="tool-dot"></span><h3>Fastboot</h3><span class="tool-state">Not checked</span></div>
+            <p>Bootloader mode · Basic bootloader details only</p>
+            <ul class="device-list"></ul>
+          </article>
+        </div>
+        <p class="usb-note"><span>ⓘ</span> ADB may ask you to authorize this computer on your phone. Fastboot devices appear only while the phone is in bootloader mode. This checker does not unlock, flash, or modify devices.</p>
+      </section>
+
+      <section class="terminal-section" id="terminal" aria-labelledby="terminal-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">DEVICE COMMANDS</p><h2 id="terminal-title">Device terminal</h2></div>
+          <span class="terminal-badge">ADB MANUAL · FASTBOOT LIMITED</span>
+        </div>
+        <div class="terminal-card">
+          <p class="terminal-intro">ADB accepts manual commands for the selected authorized device, including shell commands. Commands can change settings or data, so review them carefully. Fastboot remains limited to its supported read-only and reboot commands.</p>
+          <div class="terminal-controls">
+            <label>Connection
+              <select id="terminal-tool" aria-label="Connection type">
+                <option value="adb">ADB · Android</option>
+                <option value="fastboot">Fastboot · Bootloader</option>
+              </select>
+            </label>
+            <label>Device
+              <select id="terminal-device" aria-label="Connected device" disabled>
+                <option value="">Check USB devices first</option>
+              </select>
+            </label>
+          </div>
+          <form class="terminal-manual-form" id="terminal-manual-form">
+            <label for="terminal-manual-input">Command</label>
+            <div class="terminal-manual-controls">
+              <input id="terminal-manual-input" type="text" spellcheck="false" autocomplete="off" placeholder="adb shell getprop ro.product.model" aria-describedby="terminal-manual-hint">
+              <button class="primary-button" id="terminal-manual-run" type="submit" disabled>Run command</button>
+            </div>
+            <span class="terminal-manual-hint" id="terminal-manual-hint">For ADB, enter a command such as <code>shell getprop ro.product.model</code> or <code>adb shell …</code>. Commands outside the read-only presets require confirmation.</span>
+          </form>
+          <div class="apk-install-form">
+            <label for="apk-path-input">Install APK from this computer</label>
+            <div class="terminal-manual-controls">
+              <input id="apk-path-input" type="text" spellcheck="false" autocomplete="off" placeholder="C:\Users\You\Downloads\app.apk" aria-describedby="apk-path-hint">
+              <button class="primary-button" id="apk-install-button" type="button" disabled>Install APK</button>
+            </div>
+            <span class="terminal-manual-hint" id="apk-path-hint">Enter the full Windows path to an APK on this computer. ADB will send it to the selected phone and ask for confirmation.</span>
+          </div>
+          <div class="terminal-output" id="terminal-output" role="status" aria-live="polite">Choose a command and check for connected USB devices to enable the terminal.</div>
+          <p class="terminal-safety"><span>ⓘ</span> ADB commands run on the selected authorized phone and may modify it. Every custom ADB command requires confirmation. Fastboot unlock, erase, and flash commands remain disabled.</p>
+        </div>
+      </section>
+
+      <section class="phone-data-section" id="phone-data" aria-labelledby="phone-data-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">DEVICE DETAILS</p><h2 id="phone-data-title">Your phone data</h2></div>
+          <span class="data-updated" id="data-updated">Connect a phone to load details</span>
+        </div>
+        <div class="phone-data-grid">
+          <article class="data-card">
+            <div class="data-card-heading"><span class="data-card-icon device-data-icon">▯</span><div><h3>Device</h3><p>Hardware identification</p></div></div>
+            <dl class="data-list">
+              <div><dt>Manufacturer</dt><dd id="detail-manufacturer">Not connected</dd></div>
+              <div><dt>Model</dt><dd id="detail-model">Not connected</dd></div>
+              <div><dt>Device name</dt><dd id="detail-device">Not connected</dd></div>
+              <div><dt>ADB serial</dt><dd id="detail-serial">Not connected</dd></div>
+            </dl>
+          </article>
+          <article class="data-card">
+            <div class="data-card-heading"><span class="data-card-icon software-data-icon">◇</span><div><h3>Software</h3><p>Android and system build</p></div></div>
+            <dl class="data-list">
+              <div><dt>Android version</dt><dd id="detail-android">Not connected</dd></div>
+              <div><dt>Build</dt><dd id="detail-build">Not connected</dd></div>
+              <div><dt>Security update</dt><dd id="detail-security">Not connected</dd></div>
+              <div><dt>API level</dt><dd id="detail-api">Not connected</dd></div>
+            </dl>
+          </article>
+          <article class="data-card">
+            <div class="data-card-heading"><span class="data-card-icon battery-data-icon">▰</span><div><h3>Battery</h3><p>Live battery status</p></div></div>
+            <dl class="data-list">
+              <div><dt>Charge level</dt><dd id="detail-charge">Not connected</dd></div>
+              <div><dt>Charging state</dt><dd id="detail-charging">Not connected</dd></div>
+              <div><dt>Battery health</dt><dd id="detail-health">Not connected</dd></div>
+              <div><dt>Temperature</dt><dd id="detail-temperature">Not connected</dd></div>
+              <div><dt>Battery Saver</dt><dd id="detail-saver">Not connected</dd></div>
+            </dl>
+          </article>
+          <article class="data-card">
+            <div class="data-card-heading"><span class="data-card-icon storage-data-icon">▤</span><div><h3>Storage</h3><p>Internal data partition</p></div></div>
+            <dl class="data-list">
+              <div><dt>Used</dt><dd id="detail-storage-used">Not connected</dd></div>
+              <div><dt>Capacity</dt><dd id="detail-storage-total">Not connected</dd></div>
+              <div><dt>Used space</dt><dd id="detail-storage-percent">Not connected</dd></div>
+              <div><dt>Partition</dt><dd id="detail-storage-partition">Not connected</dd></div>
+            </dl>
+          </article>
+        </div>
+        <section class="temperature-panel" aria-labelledby="temperature-title">
+          <div class="data-card-heading temperature-heading">
+            <span class="data-card-icon temperature-data-icon">♨</span>
+            <div><h3 id="temperature-title">Temperature sensors</h3><p>Live thermal readings reported by your phone</p></div>
+            <span class="temperature-source" id="temperature-source">Check ADB to load</span>
+          </div>
+          <div class="temperature-grid">
+            <article class="temperature-reading"><span class="temperature-label">Battery</span><strong id="sensor-battery">Unavailable</strong><span class="temperature-description">Battery sensor</span></article>
+            <article class="temperature-reading"><span class="temperature-label">CPU</span><strong id="sensor-cpu">Unavailable</strong><span class="temperature-description" id="sensor-cpu-description">CPU sensor</span></article>
+            <article class="temperature-reading"><span class="temperature-label">GPU</span><strong id="sensor-gpu">Unavailable</strong><span class="temperature-description" id="sensor-gpu-description">GPU sensor</span></article>
+            <article class="temperature-reading"><span class="temperature-label">SoC / skin</span><strong id="sensor-other">Unavailable</strong><span class="temperature-description" id="sensor-other-description">Additional thermal sensors</span></article>
+          </div>
+          <ul class="temperature-sensor-list" id="temperature-sensor-list" aria-label="CPU sensor readings"></ul>
+          <p class="data-footnote temperature-footnote"><span>ⓘ</span> Sensor names and readings depend on the phone. CPU readings show the hottest exposed CPU sensor; not all phones expose CPU or GPU temperatures.</p>
+        </section>
+        <p class="data-footnote"><span>ⓘ</span> Data is read-only and comes from Android over ADB. Some values may be unavailable on certain devices.</p>
+      </section>
+
+      <section class="content-grid">
+        <div class="recommendations" id="recommendations">
+          <div class="section-heading">
+            <div><p class="eyebrow">SMALL WINS</p><h2>Recommended for you</h2></div>
+            <a href="#care">View care guide <span>→</span></a>
+          </div>
+          <article class="recommendation-card">
+            <div class="rec-icon sun">☼</div>
+            <div class="rec-copy"><span class="tag">BATTERY</span><h3>Let auto-brightness do the work</h3><p>Adaptive brightness can help save power throughout the day.</p></div>
+            <button class="text-button tip-button" data-tip="Open your phone's display settings and turn on Adaptive brightness or Auto-brightness.">How to <span>→</span></button>
+          </article>
+          <article class="recommendation-card">
+            <div class="rec-icon storage">▤</div>
+            <div class="rec-copy"><span class="tag purple-tag">STORAGE</span><h3>Make room for what matters</h3><p>Review large downloads and photos you have already backed up.</p></div>
+            <button class="text-button tip-button" data-tip="Review Storage in your phone settings. Back up anything important before deleting files.">How to <span>→</span></button>
+          </article>
+          <article class="recommendation-card">
+            <div class="rec-icon temp">♨</div>
+            <div class="rec-copy"><span class="tag orange-tag">DEVICE CARE</span><h3>Keep your phone comfortably cool</h3><p>Avoid direct sunlight and heavy use while charging.</p></div>
+            <button class="text-button tip-button" data-tip="If your phone feels unusually hot, unplug it, pause demanding apps, and let it cool in a shaded, ventilated place.">How to <span>→</span></button>
+          </article>
+        </div>
+
+        <aside class="side-column">
+          <section class="care-card" id="care">
+            <div class="care-heading"><span class="care-spark">✳</span><span class="eyebrow">A GENTLE REMINDER</span></div>
+            <h2>Best performance starts with the basics.</h2>
+            <p>Keep your phone’s software up to date and use its built-in battery and performance settings.</p>
+            <div class="care-divider"></div>
+            <div class="care-link"><span class="shield">◇</span><span>Built-in settings are made for your device.</span></div>
+          </section>
+          <section class="help-card">
+            <span class="help-icon">i</span>
+            <div><h3>About this preview</h3><p>Stats are sample values. USB checks use local ADB/Fastboot tools and only list connected devices.</p></div>
+          </section>
+        </aside>
+      </section>
+      <footer>Made for everyday phone care <span>·</span> No root access required</footer>
+    </main>
+  </div>
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form">
+      <div class="settings-heading">
+        <div><p class="eyebrow">PREFERENCES</p><h2 id="settings-title">App settings</h2></div>
+        <button class="icon-button" id="settings-close" type="button" aria-label="Close settings">×</button>
+      </div>
+      <label class="settings-field" for="refresh-interval">
+        <span><strong>Phone data refresh</strong><small>Automatically check connected devices and update readings.</small></span>
+        <select id="refresh-interval">
+          <option value="0">Manual only</option>
+          <option value="30">Every 30 seconds</option>
+          <option value="60">Every minute</option>
+          <option value="300">Every 5 minutes</option>
+        </select>
+      </label>
+      <label class="settings-field" for="color-theme">
+        <span><strong>Interface accent color</strong><small>Choose the highlight color used throughout Phone Checker.</small></span>
+        <select id="color-theme">
+          <option value="mint">Mint</option>
+          <option value="blue">Ocean blue</option>
+          <option value="violet">Violet</option>
+          <option value="amber">Amber</option>
+        </select>
+      </label>
+      <p class="settings-note">Preferences are saved in this browser. Automatic checks only read device status; they never change phone settings.</p>
+      <div class="settings-actions">
+        <button class="secondary-button" id="settings-cancel" type="button">Cancel</button>
+        <button class="primary-button" id="settings-save" type="submit">Save settings</button>
+      </div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
