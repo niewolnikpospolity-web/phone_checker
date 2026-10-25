@@ -105,9 +105,13 @@ No separate frontend build, Node.js installation, Python virtual environment, or
 
 ## 5. Add APK files (optional)
 
+please add an folder named apk_files in the main folder
+
 Copy trusted `.apk` files directly into the project's `apk_files` folder, next to `app_server.py`. Refresh the browser page, select an authorized ADB device, choose an APK, and confirm installation. Files inside subfolders are not listed.
 
 ## 6. Add Fastboot images (optional)
+
+please add an folder named flash_files in the main folder
 
 Copy `.img` files directly into the project's `flash_files` folder, next to `app_server.py`. Refresh the browser page to load them. Fastboot flashing is limited to the **boot** and **recovery** partitions and requires confirmation. Erase and unlock operations are not provided by the flash helper.
 
