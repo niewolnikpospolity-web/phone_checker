@@ -9,11 +9,20 @@ const terminalOutput = document.querySelector("#terminal-output");
 const terminalManualForm = document.querySelector("#terminal-manual-form");
 const terminalManualInput = document.querySelector("#terminal-manual-input");
 const terminalManualRun = document.querySelector("#terminal-manual-run");
-const apkPathInput = document.querySelector("#apk-path-input");
+const apkFileSelect = document.querySelector("#apk-file-select");
 const apkInstallButton = document.querySelector("#apk-install-button");
+const apkPathHint = document.querySelector("#apk-path-hint");
+const flashPartition = document.querySelector("#flash-partition");
+const flashImageSelect = document.querySelector("#flash-image-select");
+const flashImageButton = document.querySelector("#flash-image-button");
+const flashImageHint = document.querySelector("#flash-image-hint");
 const settingsDialog = document.querySelector("#settings-dialog");
 const refreshIntervalSelect = document.querySelector("#refresh-interval");
 const colorThemeSelect = document.querySelector("#color-theme");
+const layoutDensitySelect = document.querySelector("#layout-density");
+const reduceMotionInput = document.querySelector("#reduce-motion");
+const showTemperaturesInput = document.querySelector("#show-temperatures");
+const showRecommendationsInput = document.querySelector("#show-recommendations");
 const toast = document.querySelector("#toast");
 let toastTimeout;
 let connectedDeviceSerial = null;
@@ -21,6 +30,8 @@ let currentBatterySaver = null;
 let refreshTimer = null;
 let refreshInProgress = false;
 let terminalDevices = { adb: [], fastboot: [] };
+let flashImages = [];
+let apkFiles = [];
 const terminalCommands = {
   adb: [
     { id: "manufacturer", label: "Read manufacturer", command: "shell getprop ro.product.manufacturer" },
@@ -46,12 +57,15 @@ const terminalCommands = {
     { id: "reboot", label: "Reboot phone", command: "reboot", changesState: true },
   ],
 };
-let refreshInterval = readPreference("pocketcare-refresh-interval", "60", ["0", "30", "60", "300"]);
+let refreshInterval = readPreference("pocketcare-refresh-interval", "60", ["0", "15", "30", "60", "120", "300", "600"]);
 let colorTheme = readPreference("pocketcare-color-theme", "mint", ["mint", "blue", "violet", "amber"]);
+let layoutDensity = readPreference("pocketcare-layout-density", "comfortable", ["comfortable", "compact"]);
+let reduceMotion = readPreference("pocketcare-reduce-motion", "false", ["true", "false"]) === "true";
+let showTemperatures = readPreference("pocketcare-show-temperatures", "true", ["true", "false"]) === "true";
+let showRecommendations = readPreference("pocketcare-show-recommendations", "true", ["true", "false"]) === "true";
 
-document.body.dataset.theme = colorTheme;
-refreshIntervalSelect.value = refreshInterval;
-colorThemeSelect.value = colorTheme;
+loadSavedSettings();
+applyVisualSettings();
 configureRefresh();
 
 profileSelect.addEventListener("change", () => {
@@ -61,8 +75,7 @@ profileSelect.addEventListener("change", () => {
 });
 profileApplyButton.addEventListener("click", applySelectedProfile);
 document.querySelector("#settings-button").addEventListener("click", () => {
-  refreshIntervalSelect.value = refreshInterval;
-  colorThemeSelect.value = colorTheme;
+  loadSavedSettings();
   settingsDialog.showModal();
 });
 document.querySelector("#settings-close").addEventListener("click", closeSettings);
@@ -71,18 +84,33 @@ settingsDialog.addEventListener("click", (event) => {
   if (event.target === settingsDialog) closeSettings();
 });
 settingsDialog.addEventListener("cancel", () => {
-  document.body.dataset.theme = colorTheme;
+  loadSavedSettings();
+  applyVisualSettings();
 });
-colorThemeSelect.addEventListener("change", () => {
-  document.body.dataset.theme = colorThemeSelect.value;
+[
+  colorThemeSelect,
+  layoutDensitySelect,
+  reduceMotionInput,
+  showTemperaturesInput,
+  showRecommendationsInput,
+].forEach((control) => {
+  control.addEventListener("change", applyVisualSettings);
 });
 document.querySelector("#settings-form").addEventListener("submit", (event) => {
   event.preventDefault();
   refreshInterval = refreshIntervalSelect.value;
   colorTheme = colorThemeSelect.value;
+  layoutDensity = layoutDensitySelect.value;
+  reduceMotion = reduceMotionInput.checked;
+  showTemperatures = showTemperaturesInput.checked;
+  showRecommendations = showRecommendationsInput.checked;
   localStorage.setItem("pocketcare-refresh-interval", refreshInterval);
   localStorage.setItem("pocketcare-color-theme", colorTheme);
-  document.body.dataset.theme = colorTheme;
+  localStorage.setItem("pocketcare-layout-density", layoutDensity);
+  localStorage.setItem("pocketcare-reduce-motion", String(reduceMotion));
+  localStorage.setItem("pocketcare-show-temperatures", String(showTemperatures));
+  localStorage.setItem("pocketcare-show-recommendations", String(showRecommendations));
+  applyVisualSettings();
   configureRefresh();
   settingsDialog.close();
   showToast("Settings saved.");
@@ -99,8 +127,11 @@ terminalTool.addEventListener("change", () => {
 });
 terminalDevice.addEventListener("change", updateTerminalOptions);
 terminalManualInput.addEventListener("input", updateTerminalOptions);
-apkPathInput.addEventListener("input", updateTerminalOptions);
+apkFileSelect.addEventListener("change", updateTerminalOptions);
 apkInstallButton.addEventListener("click", installApkFromComputer);
+flashImageSelect.addEventListener("change", updateTerminalOptions);
+flashPartition.addEventListener("change", updateTerminalOptions);
+flashImageButton.addEventListener("click", flashLocalImage);
 terminalManualForm.addEventListener("submit", (event) => {
   event.preventDefault();
   runTerminalCommand();
@@ -112,8 +143,27 @@ function readPreference(key, fallback, allowedValues) {
   return allowedValues.includes(value) ? value : fallback;
 }
 
+function loadSavedSettings() {
+  refreshIntervalSelect.value = refreshInterval;
+  colorThemeSelect.value = colorTheme;
+  layoutDensitySelect.value = layoutDensity;
+  reduceMotionInput.checked = reduceMotion;
+  showTemperaturesInput.checked = showTemperatures;
+  showRecommendationsInput.checked = showRecommendations;
+}
+
+function applyVisualSettings() {
+  document.body.dataset.theme = colorThemeSelect.value;
+  document.body.dataset.density = layoutDensitySelect.value;
+  document.documentElement.dataset.motion = reduceMotionInput.checked ? "reduced" : "full";
+  document.body.dataset.motion = document.documentElement.dataset.motion;
+  document.body.dataset.temperatures = showTemperaturesInput.checked ? "visible" : "hidden";
+  document.body.dataset.recommendations = showRecommendationsInput.checked ? "visible" : "hidden";
+}
+
 function closeSettings() {
-  document.body.dataset.theme = colorTheme;
+  loadSavedSettings();
+  applyVisualSettings();
   settingsDialog.close();
 }
 
@@ -209,6 +259,8 @@ async function checkUsbDevices(automatic = false) {
 }
 
 checkUsbDevices(true);
+loadFlashFiles();
+loadApkFiles();
 
 function updateTerminalDevices(result) {
   terminalDevices = {
@@ -218,8 +270,10 @@ function updateTerminalDevices(result) {
   updateTerminalOptions();
 }
 
-function updateTerminalOptions() {
-  const typedPrefix = terminalManualInput.value.trim().match(/^(adb|fastboot)\s+/i);
+function updateTerminalOptions(respectTypedPrefix = true) {
+  const typedPrefix = respectTypedPrefix
+    ? terminalManualInput.value.trim().match(/^(adb|fastboot)\s+/i)
+    : null;
   if (typedPrefix && terminalTool.value !== typedPrefix[1].toLowerCase()) {
     terminalTool.value = typedPrefix[1].toLowerCase();
     updateTerminalOptions();
@@ -249,11 +303,96 @@ function updateTerminalOptions() {
   const typedCommand = resolveManualCommand(tool, terminalManualInput.value);
   terminalManualRun.disabled = !typedCommand ||
     (typedCommand.needsDevice !== false && !devices.length);
-  apkInstallButton.disabled = !terminalDevices.adb.length || !apkPathInput.value.trim();
+  apkInstallButton.disabled = !terminalDevices.adb.length || !apkFileSelect.value;
+  flashImageButton.disabled = !terminalDevices.fastboot.length || !flashImageSelect.value;
   terminalManualInput.setAttribute(
     "aria-invalid",
     terminalManualInput.value.trim() && !typedCommand ? "true" : "false",
   );
+}
+
+async function loadFlashFiles() {
+  try {
+    const response = await fetch("/api/flash-files");
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `Could not load flash_files (HTTP ${response.status}).`);
+    }
+    if (!Array.isArray(result.files)) {
+      throw new Error("Phone Checker returned an invalid flash_files listing.");
+    }
+    flashImages = result.files.filter(
+      (file) => typeof file.name === "string" && /\.img$/i.test(file.name),
+    );
+    flashImageSelect.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = flashImages.length
+      ? "Choose an image from flash_files"
+      : "No .img files in flash_files";
+    flashImageSelect.append(placeholder);
+    flashImages.forEach((file) => {
+      const option = document.createElement("option");
+      option.value = file.name;
+      option.textContent = file.name;
+      flashImageSelect.append(option);
+    });
+    flashImageSelect.disabled = flashImages.length === 0;
+    updateTerminalOptions();
+  } catch (error) {
+    flashImageSelect.replaceChildren();
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Could not load flash_files";
+    flashImageSelect.append(option);
+    flashImageSelect.disabled = true;
+    flashImageHint.textContent = error instanceof TypeError
+      ? "Could not reach Phone Checker while loading flash_files."
+      : error.message;
+    updateTerminalOptions();
+  }
+}
+
+async function loadApkFiles() {
+  try {
+    const response = await fetch("/api/apk-files");
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `Could not load apk_files (HTTP ${response.status}).`);
+    }
+    if (!Array.isArray(result.files)) {
+      throw new Error("Phone Checker returned an invalid apk_files listing.");
+    }
+    apkFiles = result.files.filter(
+      (file) => typeof file.name === "string" && /\.apk$/i.test(file.name),
+    );
+    apkFileSelect.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = apkFiles.length
+      ? "Choose an APK from apk_files"
+      : "No APK files in apk_files";
+    apkFileSelect.append(placeholder);
+    apkFiles.forEach((file) => {
+      const option = document.createElement("option");
+      option.value = file.name;
+      option.textContent = file.name;
+      apkFileSelect.append(option);
+    });
+    apkFileSelect.disabled = apkFiles.length === 0;
+    updateTerminalOptions();
+  } catch (error) {
+    apkFileSelect.replaceChildren();
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Could not load apk_files";
+    apkFileSelect.append(option);
+    apkFileSelect.disabled = true;
+    apkPathHint.textContent = error instanceof TypeError
+      ? "Could not reach Phone Checker while loading apk_files."
+      : error.message;
+    updateTerminalOptions();
+  }
 }
 
 function resolveManualCommand(tool, input) {
@@ -282,7 +421,7 @@ function resolveManualCommand(tool, input) {
 async function runTerminalCommand() {
   const selected = resolveManualCommand(terminalTool.value, terminalManualInput.value);
   if (!selected) {
-    terminalOutput.textContent = "Fastboot accepts only its supported read-only and reboot commands.";
+    terminalOutput.textContent = "Fastboot accepts supported read-only and reboot commands. Use the flash helper for boot or recovery images.";
     return;
   }
   const tool = selected.tool || terminalTool.value;
@@ -325,22 +464,115 @@ async function runTerminalCommand() {
   }
 }
 
-function installApkFromComputer() {
-  const path = apkPathInput.value.trim().replace(/^"(.*)"$/, "$1");
-  if (!path || /["\0\r\n]/.test(path)) {
-    terminalOutput.textContent = "Enter a valid Windows path to an APK file.";
-    apkPathInput.focus();
-    return;
-  }
-  if (!/\.apk$/i.test(path)) {
-    terminalOutput.textContent = "The selected file path must end in .apk.";
-    apkPathInput.focus();
+async function installApkFromComputer() {
+  const apkName = apkFileSelect.value;
+  if (!apkFiles.some((file) => file.name === apkName)) {
+    terminalOutput.textContent = "Choose an APK listed from the apk_files folder.";
     return;
   }
   terminalTool.value = "adb";
-  terminalManualInput.value = `install "${path}"`;
-  updateTerminalOptions();
-  runTerminalCommand();
+  updateTerminalOptions(false);
+  const serial = terminalDevice.value;
+  if (!serial || !terminalDevices.adb.some((device) => device.serial === serial)) {
+    terminalOutput.textContent = "Select an authorized ADB device first.";
+    return;
+  }
+  const confirmed = window.confirm(
+    `Install ${apkName} from apk_files on ${serial}?\n\nThis installs software on the selected phone. Only install APKs from a source you trust.`,
+  );
+  if (!confirmed) {
+    terminalOutput.textContent = "APK installation cancelled.";
+    return;
+  }
+
+  apkInstallButton.disabled = true;
+  terminalManualRun.disabled = true;
+  terminalTool.disabled = true;
+  terminalDevice.disabled = true;
+  apkFileSelect.disabled = true;
+  terminalOutput.textContent = `Installing ${apkName}… Keep the phone connected.`;
+  try {
+    const response = await fetch("/api/terminal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "adb",
+        command: "install_apk",
+        apkName,
+        serial,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `APK installation failed (HTTP ${response.status}).`);
+    }
+    terminalOutput.textContent = result.output || `ADB finished installing ${apkName}.`;
+  } catch (error) {
+    terminalOutput.textContent = error instanceof TypeError
+      ? "Could not reach Phone Checker. Start the app with: python app_server.py"
+      : error.message;
+  } finally {
+    terminalTool.disabled = false;
+    apkFileSelect.disabled = apkFiles.length === 0;
+    updateTerminalOptions();
+  }
+}
+
+async function flashLocalImage() {
+  const imageName = flashImageSelect.value;
+  if (!flashImages.some((file) => file.name === imageName)) {
+    terminalOutput.textContent = "Choose an image listed from the flash_files folder.";
+    return;
+  }
+  const partition = flashPartition.value;
+  terminalTool.value = "fastboot";
+  updateTerminalOptions(false);
+  const serial = terminalDevice.value;
+  if (!serial || !terminalDevices.fastboot.some((device) => device.serial === serial)) {
+    terminalOutput.textContent = "Select a connected Fastboot device first.";
+    return;
+  }
+  const confirmed = window.confirm(
+    `Flash ${imageName} from flash_files to the ${partition} partition on ${serial}?\n\nThis writes to the device and an incompatible image can make the phone unbootable. Confirm that this image is specifically for your exact device. No erase command will be run.`,
+  );
+  if (!confirmed) {
+    terminalOutput.textContent = "Flash cancelled.";
+    return;
+  }
+
+  flashImageButton.disabled = true;
+  terminalManualRun.disabled = true;
+  terminalTool.disabled = true;
+  terminalDevice.disabled = true;
+  flashPartition.disabled = true;
+  flashImageSelect.disabled = true;
+  terminalOutput.textContent = `Flashing ${partition} image… Do not disconnect the phone.`;
+  try {
+    const response = await fetch("/api/terminal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "fastboot",
+        command: `flash_${partition}`,
+        imageName,
+        serial,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `Flash failed (HTTP ${response.status}).`);
+    }
+    terminalOutput.textContent = result.output || `Fastboot finished flashing ${partition}.`;
+  } catch (error) {
+    terminalOutput.textContent = error instanceof TypeError
+      ? "Could not reach Phone Checker. Start the app with: python app_server.py"
+      : error.message;
+  } finally {
+    terminalTool.disabled = false;
+    flashPartition.disabled = false;
+    flashImageSelect.disabled = flashImages.length === 0;
+    updateTerminalOptions();
+  }
 }
 
 function renderToolResult(elementId, result, toolName) {
@@ -443,10 +675,10 @@ function renderAndroidInfo(device) {
   }
 
   if (info.storage) {
-    document.querySelector("#storage-used").textContent = info.storage.usedGb;
-    document.querySelector("#storage-total").textContent = info.storage.totalGb;
+    document.querySelector("#storage-used").textContent = info.storage.usedGB;
+    document.querySelector("#storage-total").textContent = info.storage.totalGB;
     document.querySelector("#storage-meter").style.width = `${info.storage.percent}%`;
-    document.querySelector("#storage-caption").textContent = `${info.storage.percent}% used · /data`;
+    document.querySelector("#storage-caption").textContent = `${info.storage.percent}% used · internal storage`;
   } else {
     document.querySelector("#storage-caption").textContent = info.storageError || "Storage data unavailable";
   }
@@ -489,10 +721,13 @@ function renderPhoneData(device) {
           ? "Requested · unplug to activate"
           : "Off",
   );
-  setPhoneDetail("storage-used", info.storage ? `${info.storage.usedGb} GB` : "");
-  setPhoneDetail("storage-total", info.storage ? `${info.storage.totalGb} GB` : "");
+  setPhoneDetail(
+    "storage-used",
+    info.storage ? `${info.storage.usedGB} GB · ${info.storage.availableGB} GB available` : "",
+  );
+  setPhoneDetail("storage-total", info.storage ? `${info.storage.totalGB} GB` : "");
   setPhoneDetail("storage-percent", info.storage ? `${info.storage.percent}%` : "");
-  setPhoneDetail("storage-partition", info.storage ? "/data" : "");
+  setPhoneDetail("storage-partition", info.storage ? "Internal storage" : "");
   renderTemperatures(info);
   document.querySelector("#data-updated").textContent = "Updated just now";
 }

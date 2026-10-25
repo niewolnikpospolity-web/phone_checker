@@ -8,7 +8,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+FLASH_FILES_DIR = ROOT / "flash_files"
+APK_FILES_DIR = ROOT / "apk_files"
 TIMEOUT_SECONDS = 5
+FASTBOOT_FLASH_TIMEOUT_SECONDS = 300
+ADB_INSTALL_TIMEOUT_SECONDS = 300
 MAX_MANUAL_ADB_COMMAND_LENGTH = 8192
 SAFE_SERIAL = re.compile(r"^[A-Za-z0-9._:-]+$")
 class AppHandler(SimpleHTTPRequestHandler):
@@ -18,6 +22,12 @@ class AppHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/devices":
             self.send_device_results()
+            return
+        if self.path == "/api/flash-files":
+            self.send_flash_files()
+            return
+        if self.path == "/api/apk-files":
+            self.send_apk_files()
             return
         super().do_GET()
 
@@ -98,8 +108,12 @@ class AppHandler(SimpleHTTPRequestHandler):
         tool = payload.get("tool")
         command = payload.get("command")
         manual_command = payload.get("manualCommand")
+        image_name = payload.get("imageName")
+        apk_name = payload.get("apkName")
         serial = payload.get("serial")
-        result, status = execute_terminal_command(tool, command, serial, manual_command)
+        result, status = execute_terminal_command(
+            tool, command, serial, manual_command, image_name, apk_name
+        )
         self.send_json(status, result)
 
     def send_json(self, status, payload):
@@ -123,6 +137,30 @@ class AppHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def send_flash_files(self):
+        try:
+            files = [
+                {"name": path.name, "size": path.stat().st_size}
+                for path in sorted(FLASH_FILES_DIR.iterdir(), key=lambda item: item.name.lower())
+                if path.suffix.lower() == ".img" and not path.is_symlink() and path.is_file()
+            ]
+        except OSError as error:
+            self.send_json(500, {"error": f"Could not read the flash_files folder: {error}"})
+            return
+        self.send_json(200, {"files": files})
+
+    def send_apk_files(self):
+        try:
+            files = [
+                {"name": path.name, "size": path.stat().st_size}
+                for path in sorted(APK_FILES_DIR.iterdir(), key=lambda item: item.name.lower())
+                if path.suffix.lower() == ".apk" and not path.is_symlink() and path.is_file()
+            ]
+        except OSError as error:
+            self.send_json(500, {"error": f"Could not read the apk_files folder: {error}"})
+            return
+        self.send_json(200, {"files": files})
 
 
 def apply_power_profile(serial, profile):
@@ -241,18 +279,18 @@ def read_power_saver_request(executable, serial):
     return output.strip() == "1"
 
 
-def run_tool(executable, arguments):
+def run_tool(executable, arguments, timeout=TIMEOUT_SECONDS):
     try:
         completed = subprocess.run(
             [executable, *arguments],
             capture_output=True,
             text=True,
-            timeout=TIMEOUT_SECONDS,
+            timeout=timeout,
             check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except subprocess.TimeoutExpired:
-        return None, f"Command did not respond within {TIMEOUT_SECONDS} seconds."
+        return None, f"Command did not respond within {timeout} seconds."
     except OSError as error:
         return None, str(error)
 
@@ -262,7 +300,9 @@ def run_tool(executable, arguments):
     return output.strip(), None
 
 
-def execute_terminal_command(tool, command, serial, manual_command=None):
+def execute_terminal_command(
+    tool, command, serial, manual_command=None, image_name=None, apk_name=None
+):
     if not isinstance(tool, str):
         return {"error": "Choose ADB or Fastboot."}, 400
     command_map = {
@@ -289,6 +329,8 @@ def execute_terminal_command(tool, command, serial, manual_command=None):
             "reboot": ["reboot"],
         },
     }
+    flash_partitions = {"flash_boot": "boot", "flash_recovery": "recovery"}
+    installs_apk = tool == "adb" and command == "install_apk"
     if tool not in command_map:
         return {"error": "Choose ADB or Fastboot."}, 400
     manual_arguments = None
@@ -336,6 +378,61 @@ def execute_terminal_command(tool, command, serial, manual_command=None):
     if tool == "fastboot" and command == "devices" and serial is None:
         arguments = ["devices"]
         requires_device = False
+    elif installs_apk:
+        if (
+            not isinstance(apk_name, str)
+            or not apk_name
+            or apk_name != apk_name.strip()
+            or "/" in apk_name
+            or "\\" in apk_name
+            or "\0" in apk_name
+            or Path(apk_name).name != apk_name
+            or Path(apk_name).suffix.lower() != ".apk"
+        ):
+            return {"error": "Choose an .apk file from the apk_files folder."}, 400
+        try:
+            apk_root = APK_FILES_DIR.resolve(strict=True)
+        except (OSError, RuntimeError):
+            return {"error": "The apk_files folder is missing or unavailable."}, 503
+        apk_candidate = APK_FILES_DIR / apk_name
+        if apk_candidate.is_symlink():
+            return {"error": "APK files must be stored directly in apk_files."}, 400
+        try:
+            apk_file = apk_candidate.resolve(strict=True)
+        except (OSError, RuntimeError):
+            return {"error": "That APK is not present in the apk_files folder."}, 400
+        if apk_file.parent != apk_root or not apk_file.is_file():
+            return {"error": "APK files must be stored directly in apk_files."}, 400
+        arguments = ["install", str(apk_file)]
+        requires_device = True
+    elif tool == "fastboot" and command in flash_partitions:
+        if (
+            not isinstance(image_name, str)
+            or not image_name
+            or image_name != image_name.strip()
+            or "/" in image_name
+            or "\\" in image_name
+            or "\0" in image_name
+            or Path(image_name).name != image_name
+        ):
+            return {"error": "Choose an .img file from the flash_files folder."}, 400
+        if Path(image_name).suffix.lower() != ".img":
+            return {"error": "Choose an .img file from the flash_files folder."}, 400
+        try:
+            flash_root = FLASH_FILES_DIR.resolve(strict=True)
+        except (OSError, RuntimeError):
+            return {"error": "The flash_files folder is missing or unavailable."}, 503
+        image_candidate = FLASH_FILES_DIR / image_name
+        if image_candidate.is_symlink():
+            return {"error": "Image files must be stored directly in flash_files."}, 400
+        try:
+            image_file = image_candidate.resolve(strict=True)
+        except (OSError, RuntimeError):
+            return {"error": "That image is not present in the flash_files folder."}, 400
+        if image_file.parent != flash_root or not image_file.is_file():
+            return {"error": "Image files must be stored directly in flash_files."}, 400
+        arguments = ["flash", flash_partitions[command], str(image_file)]
+        requires_device = True
     elif tool == "adb" and manual_arguments is not None:
         arguments = manual_arguments
         requires_device = True
@@ -372,7 +469,12 @@ def execute_terminal_command(tool, command, serial, manual_command=None):
             return {"error": f"That device is no longer connected through {tool}."}, 409
         arguments = ["-s", serial, *arguments]
 
-    output, error = run_tool(executable, arguments)
+    timeout = (
+        FASTBOOT_FLASH_TIMEOUT_SECONDS if command in flash_partitions
+        else ADB_INSTALL_TIMEOUT_SECONDS if installs_apk
+        else TIMEOUT_SECONDS
+    )
+    output, error = run_tool(executable, arguments, timeout=timeout)
     if error:
         return {"error": error}, 502
     return {
@@ -460,12 +562,17 @@ def inspect_android_device(executable, serial):
         info["temperatureError"] = thermal_error
 
     storage_output, storage_error = run_tool(
-        executable, ["-s", serial, "shell", "df", "-k", "/data"]
+        executable, ["-s", serial, "shell", "dumpsys", "diskstats"]
     )
-    if storage_output and not storage_error:
-        info["storage"] = parse_storage_info(storage_output)
+    mount_output, mount_error = run_tool(
+        executable, ["-s", serial, "shell", "dumpsys", "mount"]
+    )
+    if storage_output and mount_output and not storage_error and not mount_error:
+        info["storage"] = parse_storage_info(storage_output, mount_output)
+        if info["storage"] is None:
+            info["storageError"] = "Android did not provide consistent internal storage totals."
     else:
-        info["storageError"] = storage_error
+        info["storageError"] = storage_error or mount_error
 
     power_output, power_error = run_tool(
         executable, ["-s", serial, "shell", "dumpsys", "power"]
@@ -544,19 +651,37 @@ def parse_thermal_zones(output):
     return sensors
 
 
-def parse_storage_info(output):
-    for line in reversed(output.splitlines()):
-        fields = line.split()
-        if len(fields) >= 6 and fields[1].isdigit() and fields[2].isdigit():
-            total_kb = int(fields[1])
-            used_kb = int(fields[2])
-            if total_kb > 0:
-                return {
-                    "usedGb": round(used_kb / 1024 / 1024, 1),
-                    "totalGb": round(total_kb / 1024 / 1024, 1),
-                    "percent": min(100, round(used_kb * 100 / total_kb)),
-                }
-    return None
+def parse_storage_info(diskstats_output, mount_output):
+    free_match = re.search(
+        r"^\s*Data-Free:\s*(\d+)\s*K\s*/\s*(\d+)\s*K\s+total\b",
+        diskstats_output,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    total_match = re.search(
+        r"^\s*Internal storage\s+\([^)]*\)\s+total size:\s*(\d+)(?:\s+\(\d+\s+MiB\))?\s*$",
+        mount_output,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    if not free_match or not total_match:
+        return None
+
+    free_bytes = int(free_match.group(1)) * 1024
+    total_bytes = int(total_match.group(1))
+    if total_bytes <= 0 or free_bytes > total_bytes:
+        return None
+
+    used_bytes = total_bytes - free_bytes
+    gibibyte = 1024 ** 3
+    gigabyte = 1000 ** 3
+    return {
+        "usedGB": round(used_bytes / gigabyte, 1),
+        "availableGB": round(free_bytes / gigabyte, 1),
+        "totalGB": round(total_bytes / gigabyte, 1),
+        "usedGiB": round(used_bytes / gibibyte, 1),
+        "availableGiB": round(free_bytes / gibibyte, 1),
+        "totalGiB": round(total_bytes / gibibyte, 1),
+        "percent": round(used_bytes * 100 / total_bytes),
+    }
 
 
 def inspect_fastboot_device(executable, serial):

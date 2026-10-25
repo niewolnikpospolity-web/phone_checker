@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b1016">
   <title>Phone Checker</title>
-  <link rel="stylesheet" href="styles.css?v=11">
-  <script src="app.js?v=13" defer></script>
+  <link rel="stylesheet" href="styles.css?v=13">
+  <script src="app.js?v=20" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -24,14 +24,6 @@
         <a class="nav-item" href="#recommendations"><span class="nav-icon">✳</span> Recommendations</a>
         <a class="nav-item" href="#care"><span class="nav-icon">♡</span> Care guide</a>
       </nav>
-
-      <div class="sidebar-bottom">
-        <div class="profile">
-          <div class="avatar">D</div>
-          <div><strong>Demo device</strong><p>Local preview</p></div>
-          <span class="more">···</span>
-        </div>
-      </div>
     </aside>
 
     <main id="overview">
@@ -115,7 +107,7 @@
             <ul class="device-list"></ul>
           </article>
         </div>
-        <p class="usb-note"><span>ⓘ</span> ADB may ask you to authorize this computer on your phone. Fastboot devices appear only while the phone is in bootloader mode. This checker does not unlock, flash, or modify devices.</p>
+        <p class="usb-note"><span>ⓘ</span> ADB may ask you to authorize this computer on your phone. Fastboot devices appear only while the phone is in bootloader mode. Fastboot flashing is limited to boot and recovery images; this checker does not unlock or erase devices.</p>
       </section>
 
       <section class="terminal-section" id="terminal" aria-labelledby="terminal-title">
@@ -124,7 +116,7 @@
           <span class="terminal-badge">ADB MANUAL · FASTBOOT LIMITED</span>
         </div>
         <div class="terminal-card">
-          <p class="terminal-intro">ADB accepts manual commands for the selected authorized device, including shell commands. Commands can change settings or data, so review them carefully. Fastboot remains limited to its supported read-only and reboot commands.</p>
+          <p class="terminal-intro">ADB accepts manual commands for the selected authorized device, including shell commands. Fastboot supports read-only checks, reboot, and flashing only the boot or recovery partition from a local .img file.</p>
           <div class="terminal-controls">
             <label>Connection
               <select id="terminal-tool" aria-label="Connection type">
@@ -147,15 +139,31 @@
             <span class="terminal-manual-hint" id="terminal-manual-hint">For ADB, enter a command such as <code>shell getprop ro.product.model</code> or <code>adb shell …</code>. Commands outside the read-only presets require confirmation.</span>
           </form>
           <div class="apk-install-form">
-            <label for="apk-path-input">Install APK from this computer</label>
+            <label for="apk-file-select">Install APK from apk_files</label>
             <div class="terminal-manual-controls">
-              <input id="apk-path-input" type="text" spellcheck="false" autocomplete="off" placeholder="C:\Users\You\Downloads\app.apk" aria-describedby="apk-path-hint">
+              <select id="apk-file-select" aria-label="APK file from apk_files" aria-describedby="apk-path-hint" disabled>
+                <option value="">Loading APK files…</option>
+              </select>
               <button class="primary-button" id="apk-install-button" type="button" disabled>Install APK</button>
             </div>
-            <span class="terminal-manual-hint" id="apk-path-hint">Enter the full Windows path to an APK on this computer. ADB will send it to the selected phone and ask for confirmation.</span>
+            <span class="terminal-manual-hint" id="apk-path-hint">Only .apk files directly inside the apk_files folder are listed. ADB sends the selected file to the authorized phone after confirmation.</span>
+          </div>
+          <div class="fastboot-flash-form">
+            <label for="flash-partition">Flash boot or recovery image</label>
+            <div class="flash-image-options">
+              <select id="flash-partition" aria-label="Partition to flash">
+                <option value="boot">Boot</option>
+                <option value="recovery">Recovery</option>
+              </select>
+              <select id="flash-image-select" aria-label="Image file from flash_files" aria-describedby="flash-image-hint" disabled>
+                <option value="">Loading images from flash_files…</option>
+              </select>
+              <button class="primary-button" id="flash-image-button" type="button" disabled>Flash image</button>
+            </div>
+            <span class="terminal-manual-hint" id="flash-image-hint">Only .img files directly inside the flash_files folder are listed. Only boot and recovery can be flashed; erase and other partitions remain blocked. Use an image made for your exact device. Flashing an incompatible image can make the phone unbootable.</span>
           </div>
           <div class="terminal-output" id="terminal-output" role="status" aria-live="polite">Choose a command and check for connected USB devices to enable the terminal.</div>
-          <p class="terminal-safety"><span>ⓘ</span> ADB commands run on the selected authorized phone and may modify it. Every custom ADB command requires confirmation. Fastboot unlock, erase, and flash commands remain disabled.</p>
+          <p class="terminal-safety"><span>ⓘ</span> ADB commands can modify the selected phone and require confirmation when custom. Fastboot flash is limited to boot/recovery images and requires confirmation; unlock and erase commands remain disabled.</p>
         </div>
       </section>
 
@@ -264,27 +272,58 @@
   <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
     <form id="settings-form">
       <div class="settings-heading">
-        <div><p class="eyebrow">PREFERENCES</p><h2 id="settings-title">App settings</h2></div>
-        <button class="icon-button" id="settings-close" type="button" aria-label="Close settings">×</button>
+        <div><p class="eyebrow">MAKE IT YOURS</p><h2 id="settings-title">Display settings</h2><p class="settings-subtitle">Personalize the dashboard and its behavior.</p></div>
+        <button class="icon-button settings-close-button" id="settings-close" type="button" aria-label="Close settings">×</button>
       </div>
-      <label class="settings-field" for="refresh-interval">
-        <span><strong>Phone data refresh</strong><small>Automatically check connected devices and update readings.</small></span>
-        <select id="refresh-interval">
-          <option value="0">Manual only</option>
-          <option value="30">Every 30 seconds</option>
-          <option value="60">Every minute</option>
-          <option value="300">Every 5 minutes</option>
-        </select>
-      </label>
-      <label class="settings-field" for="color-theme">
-        <span><strong>Interface accent color</strong><small>Choose the highlight color used throughout Phone Checker.</small></span>
-        <select id="color-theme">
-          <option value="mint">Mint</option>
-          <option value="blue">Ocean blue</option>
-          <option value="violet">Violet</option>
-          <option value="amber">Amber</option>
-        </select>
-      </label>
+      <section class="settings-section" aria-labelledby="settings-appearance-title">
+        <h3 id="settings-appearance-title">Appearance</h3>
+        <label class="settings-field" for="color-theme">
+          <span><strong>Accent color</strong><small>Change the highlight color used across the dashboard.</small></span>
+          <select id="color-theme">
+            <option value="mint">Mint</option>
+            <option value="blue">Ocean blue</option>
+            <option value="violet">Violet</option>
+            <option value="amber">Amber</option>
+          </select>
+        </label>
+        <label class="settings-field" for="layout-density">
+          <span><strong>Dashboard spacing</strong><small>Choose a roomier or more compact layout.</small></span>
+          <select id="layout-density">
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </label>
+        <label class="settings-toggle" for="reduce-motion">
+          <span><strong>Reduce animations</strong><small>Minimize interface movement and smooth scrolling.</small></span>
+          <input id="reduce-motion" type="checkbox">
+        </label>
+      </section>
+      <section class="settings-section" aria-labelledby="settings-dashboard-title">
+        <h3 id="settings-dashboard-title">Dashboard content</h3>
+        <label class="settings-toggle" for="show-temperatures">
+          <span><strong>Temperature sensor panel</strong><small>Show detailed phone temperature readings.</small></span>
+          <input id="show-temperatures" type="checkbox" checked>
+        </label>
+        <label class="settings-toggle" for="show-recommendations">
+          <span><strong>Care recommendations</strong><small>Show everyday battery, storage, and care tips.</small></span>
+          <input id="show-recommendations" type="checkbox" checked>
+        </label>
+      </section>
+      <section class="settings-section" aria-labelledby="settings-refresh-title">
+        <h3 id="settings-refresh-title">Device checks</h3>
+        <label class="settings-field" for="refresh-interval">
+          <span><strong>Automatic refresh</strong><small>Choose how often Phone Checker reads connected device status.</small></span>
+          <select id="refresh-interval">
+            <option value="0">Manual only</option>
+            <option value="15">Every 15 seconds</option>
+            <option value="30">Every 30 seconds</option>
+            <option value="60">Every minute</option>
+            <option value="120">Every 2 minutes</option>
+            <option value="300">Every 5 minutes</option>
+            <option value="600">Every 10 minutes</option>
+          </select>
+        </label>
+      </section>
       <p class="settings-note">Preferences are saved in this browser. Automatic checks only read device status; they never change phone settings.</p>
       <div class="settings-actions">
         <button class="secondary-button" id="settings-cancel" type="button">Cancel</button>
