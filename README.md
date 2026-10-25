@@ -5,4 +5,3 @@ can be used for much frendlier adb acces
 
 the app is hosted localy under http://127.0.0.1:8000/
 
-
