@@ -32,51 +32,10 @@ class AppHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
-        if self.path == "/api/terminal":
-            self.run_terminal_command()
-            return
-        if self.path != "/api/power-profile":
+        if self.path != "/api/terminal":
             self.send_json(404, {"error": "Not found."})
             return
-        if self.headers.get("Origin") not in (
-            "http://127.0.0.1:8000",
-            "http://localhost:8000",
-        ):
-            self.send_json(403, {"error": "Requests must come from the local Phone Checker page."})
-            return
-
-        try:
-            content_length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            self.send_json(400, {"error": "Invalid request length."})
-            return
-        if content_length <= 0 or content_length > 2048:
-            self.send_json(400, {"error": "Invalid request size."})
-            return
-        if self.headers.get_content_type() != "application/json":
-            self.send_json(415, {"error": "Send a JSON request."})
-            return
-
-        try:
-            payload = json.loads(self.rfile.read(content_length))
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            self.send_json(400, {"error": "Invalid JSON request."})
-            return
-        if not isinstance(payload, dict):
-            self.send_json(400, {"error": "Invalid request."})
-            return
-
-        serial = payload.get("serial")
-        profile = payload.get("profile")
-        if not isinstance(serial, str) or not SAFE_SERIAL.fullmatch(serial):
-            self.send_json(400, {"error": "Invalid device serial."})
-            return
-        if profile not in ("Balanced", "Battery saver"):
-            self.send_json(400, {"error": "Choose Balanced or Battery saver."})
-            return
-
-        result, status = apply_power_profile(serial, profile)
-        self.send_json(status, result)
+        self.run_terminal_command()
 
     def run_terminal_command(self):
         if self.headers.get("Origin") not in (
@@ -161,69 +120,6 @@ class AppHandler(SimpleHTTPRequestHandler):
             self.send_json(500, {"error": f"Could not read the apk_files folder: {error}"})
             return
         self.send_json(200, {"files": files})
-
-
-def apply_power_profile(serial, profile):
-    executable = shutil.which("adb")
-    if executable is None:
-        return {"error": "ADB was not found. Install Android Platform Tools and restart Phone Checker."}, 503
-
-    output, error = run_tool(executable, ["devices"])
-    if error:
-        return {"error": f"Could not check connected ADB devices: {error}"}, 502
-    connected = {
-        device["serial"]
-        for device in parse_adb_devices(output or "")
-        if device["status"] == "device"
-    }
-    if serial not in connected:
-        return {"error": "That phone is not currently connected and authorized through ADB."}, 409
-
-    mode = "1" if profile == "Battery saver" else "0"
-    _, error = run_tool(
-        executable, ["-s", serial, "shell", "settings", "put", "global", "low_power", mode]
-    )
-    if error:
-        return {"error": f"Android could not apply {profile}: {error}"}, 502
-
-    output, error = run_tool(
-        executable, ["-s", serial, "shell", "settings", "get", "global", "low_power"]
-    )
-    if error:
-        return {"error": f"Android accepted the request, but could not verify it: {error}"}, 502
-    requested = (output or "").strip() == mode
-    if not requested:
-        return {"error": "Android did not save the requested Battery Saver setting."}, 502
-
-    output, error = run_tool(executable, ["-s", serial, "shell", "dumpsys", "power"])
-    if error:
-        return {"error": f"Could not verify the active power mode: {error}"}, 502
-    battery_saver = parse_power_saver_state(output or "")
-    if battery_saver is None:
-        return {
-            "error": "Android did not report its Battery Saver state. Check the phone’s Battery settings."
-        }, 502
-    expected = mode == "1"
-    if battery_saver != expected:
-        battery_output, battery_error = run_tool(
-            executable, ["-s", serial, "shell", "dumpsys", "battery"]
-        )
-        battery = parse_battery_info(battery_output or "") if not battery_error else {}
-        if expected and battery.get("pluggedIn"):
-            return {
-                "profile": profile,
-                "batterySaver": battery_saver,
-                "requested": True,
-                "pending": True,
-                "message": "Android saved the request but will only activate Battery Saver after the phone is unplugged.",
-            }, 202
-        return {
-            "error": (
-                f"Android did not switch Battery Saver {'on' if expected else 'off'}. "
-                "Check the phone’s Battery settings and try again."
-            )
-        }, 502
-    return {"profile": profile, "batterySaver": battery_saver}, 200
 
 
 def inspect_devices(tool, arguments):

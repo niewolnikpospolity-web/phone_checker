@@ -18,15 +18,11 @@ Over ADB, the dashboard reads device and software information, including manufac
 It also displays:
 
 - Battery charge, charging state, reported health, and battery temperature.
-- Battery Saver requested/active state.
+- Read-only Battery Saver requested/active status.
 - Internal storage used, total capacity, available capacity, and used percentage. Storage values depend on the data Android exposes and can vary slightly from the phone's Settings display.
 - Reported battery, CPU, GPU, SoC, and skin temperature readings when the phone exposes those sensors. Sensor names and availability vary by device.
 
 Device readings are informational. Some phones do not expose every value.
-
-### Power profile
-
-For an authorized ADB device, the dashboard can request **Battery saver** or **Balanced** (Battery Saver off), then checks Android's reported state. Android or the phone manufacturer may delay or restrict applying the request, particularly while charging. This changes the Android Battery Saver setting; it does not tune CPU/GPU clocks or voltages.
 
 ### Device terminal
 
@@ -35,7 +31,7 @@ For an authorized ADB device, the dashboard can request **Battery saver** or **B
 - Provides limited Fastboot checks (`getvar product`, `getvar version`, `getvar is-userspace`, and device listing) plus reboot.
 - Requires a selected connected device for device-specific commands.
 
-ADB commands can change phone settings or data. Review commands before confirming them. Fastboot is intentionally restricted: the terminal does not allow arbitrary Fastboot commands.
+ADB commands can change phone settings or data. Review commands before confirming them. There is no dedicated power-mode changer in the dashboard; Battery Saver is displayed as read-only status. Fastboot is intentionally restricted: the terminal does not allow arbitrary Fastboot commands.
 
 ### Install APKs from the project folder
 

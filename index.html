@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b1016">
   <title>Phone Checker</title>
-  <link rel="stylesheet" href="styles.css?v=13">
-  <script src="app.js?v=20" defer></script>
+  <link rel="stylesheet" href="styles.css?v=14">
+  <script src="app.js?v=21" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -69,18 +69,6 @@
             <div class="metric-value"><span id="temperature-reading">31</span><span>°C</span></div>
             <div class="metric-status"><span></span> <span id="temperature-status">Demo reading</span></div>
             <p class="metric-caption" id="temperature-caption">Check ADB for live battery temperature</p>
-          </article>
-          <article class="metric">
-            <div class="metric-top"><span>Power profile</span><span class="metric-icon profile-icon">◉</span></div>
-            <label class="select-wrap">
-              <select id="profile-select" aria-label="Choose a recommended profile">
-                <option value="Balanced">Balanced</option>
-                <option value="Battery saver">Battery saver</option>
-              </select>
-            </label>
-            <button class="profile-apply-button" id="profile-apply-button" disabled>Apply to phone</button>
-            <p class="metric-caption" id="profile-caption">Connect an authorized phone to change its power mode</p>
-            <p class="power-note">USB connection works without PC Wi‑Fi.</p>
           </article>
         </div>
         <p class="device-footnote" id="device-footnote"><span>ⓘ</span> Values are samples until an authorized Android phone is checked over ADB. Fastboot provides bootloader details only.</p>

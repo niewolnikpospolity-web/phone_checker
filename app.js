@@ -1,6 +1,3 @@
-const profileSelect = document.querySelector("#profile-select");
-const profileCaption = document.querySelector("#profile-caption");
-const profileApplyButton = document.querySelector("#profile-apply-button");
 const usbCheckButton = document.querySelector("#usb-check-button");
 const usbMessage = document.querySelector("#usb-message");
 const terminalTool = document.querySelector("#terminal-tool");
@@ -25,8 +22,6 @@ const showTemperaturesInput = document.querySelector("#show-temperatures");
 const showRecommendationsInput = document.querySelector("#show-recommendations");
 const toast = document.querySelector("#toast");
 let toastTimeout;
-let connectedDeviceSerial = null;
-let currentBatterySaver = null;
 let refreshTimer = null;
 let refreshInProgress = false;
 let terminalDevices = { adb: [], fastboot: [] };
@@ -68,12 +63,6 @@ loadSavedSettings();
 applyVisualSettings();
 configureRefresh();
 
-profileSelect.addEventListener("change", () => {
-  profileCaption.textContent = profileSelect.value === "Battery saver"
-    ? "Reduces background activity to extend battery life"
-    : "Turns Android Battery Saver off";
-});
-profileApplyButton.addEventListener("click", applySelectedProfile);
 document.querySelector("#settings-button").addEventListener("click", () => {
   loadSavedSettings();
   settingsDialog.showModal();
@@ -199,32 +188,13 @@ async function checkUsbDevices(automatic = false) {
     );
     if (androidDevice) {
       renderAndroidInfo(androidDevice);
-      connectedDeviceSerial = androidDevice.serial;
-      currentBatterySaver = androidDevice.info.batterySaver;
-      profileApplyButton.disabled = false;
       renderPhoneData(androidDevice);
-      const saverRequested = androidDevice.info.batterySaverRequested;
-      if (currentBatterySaver !== null && saverRequested !== null) {
-        profileSelect.value = saverRequested ? "Battery saver" : "Balanced";
-        if (saverRequested && !currentBatterySaver && androidDevice.info.battery?.pluggedIn) {
-          profileCaption.textContent = "Requested · unplug the phone to activate Battery Saver";
-        } else {
-          profileCaption.textContent = currentBatterySaver
-            ? "Battery Saver is currently on"
-            : "Battery Saver is currently off";
-        }
-      } else {
-        profileCaption.textContent = "Power mode status unavailable";
-      }
     } else if (fastbootFound) {
       renderFastbootInfo(result.fastboot.devices.find((device) => device.info));
-      disablePowerProfile("Return to Android and connect with ADB to change power mode.");
     } else if (adbFound) {
       resetPhoneInfo("Authorize this computer on your phone to read device info.");
-      disablePowerProfile("Authorize this computer on your phone to change power mode.");
     } else {
       resetPhoneInfo("Demo metrics · Check USB devices for live Android info");
-      disablePowerProfile("Connect an authorized Android phone through ADB to change power mode.");
     }
     if (!androidDevice && !fastbootFound && adbFound) {
       document.querySelector("#connection-status").textContent = "USB authorization needed";
@@ -249,7 +219,6 @@ async function checkUsbDevices(automatic = false) {
     updateTerminalDevices({ adb: { devices: [] }, fastboot: { devices: [] } });
     setToolUnavailable("adb-result", "Checker unavailable");
     setToolUnavailable("fastboot-result", "Checker unavailable");
-    disablePowerProfile("Device checker unavailable.");
     setPhoneDataUnavailable("Device checker unavailable");
   } finally {
     refreshInProgress = false;
@@ -691,7 +660,7 @@ function renderAndroidInfo(device) {
     document.querySelector("#temperature-caption").textContent = "Battery temperature unavailable";
   }
   document.querySelector("#device-footnote").textContent =
-    "ⓘ Live values are read-only Android status from the connected phone. Profile choices do not change device settings.";
+    "ⓘ Live values are read-only Android status from the connected phone.";
 }
 
 function renderPhoneData(device) {
@@ -777,67 +746,8 @@ function setPhoneDetail(name, value) {
   document.querySelector(`#detail-${name}`).textContent = value || "Unavailable";
 }
 
-async function applySelectedProfile() {
-  if (!connectedDeviceSerial) {
-    showToast("Check for an authorized ADB device before applying a power profile.");
-    return;
-  }
-
-  const profile = profileSelect.value;
-  const action = profile === "Battery saver"
-    ? "Turn on Android Battery Saver?"
-    : "Turn off Android Battery Saver and return to normal power mode?";
-  if (!window.confirm(`${action}\n\nThis changes the connected phone’s system power setting.`)) {
-    return;
-  }
-
-  profileApplyButton.disabled = true;
-  profileApplyButton.textContent = "Applying…";
-  profileCaption.textContent = "Applying the Android power setting…";
-  try {
-    const response = await fetch("/api/power-profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serial: connectedDeviceSerial, profile }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || `Could not apply profile (HTTP ${response.status}).`);
-    }
-    currentBatterySaver = result.batterySaver;
-    profileSelect.value = result.requested ? "Battery saver" : result.profile;
-    if (result.pending) {
-      profileCaption.textContent = "Requested · unplug the phone to activate Battery Saver";
-      setPhoneDetail("saver", "Requested · unplug to activate");
-      showToast(result.message);
-    } else {
-      profileCaption.textContent = currentBatterySaver
-        ? "Battery Saver is on"
-        : "Battery Saver is off · Normal power mode";
-      setPhoneDetail("saver", currentBatterySaver ? "On" : "Off");
-      showToast(`Updated ${result.profile} on the connected phone.`);
-    }
-  } catch (error) {
-    profileCaption.textContent = "Power mode was not confirmed";
-    showToast(error instanceof TypeError
-      ? "Could not reach the local phone checker. Restart Phone Checker and try again."
-      : error.message);
-  } finally {
-    profileApplyButton.disabled = !connectedDeviceSerial;
-    profileApplyButton.textContent = "Apply to phone";
-  }
-}
-
-function disablePowerProfile(message) {
-  connectedDeviceSerial = null;
-  currentBatterySaver = null;
-  profileApplyButton.disabled = true;
-  profileCaption.textContent = message;
-}
-
 function renderFastbootInfo(device) {
   resetPhoneInfo("Phone is in Fastboot mode. Android battery, storage, and temperature are unavailable here.");
-  disablePowerProfile("Fastboot does not expose Android’s Battery Saver control.");
   document.querySelector("#connection-status").textContent = "Fastboot mode";
   if (device?.info) {
     const details = formatFastbootInfo(device.info);
@@ -866,7 +776,6 @@ function resetPhoneInfo(subtitle) {
   document.querySelector("#device-footnote").textContent =
     "ⓘ Live metrics require an authorized Android phone in ADB mode. Fastboot mode exposes bootloader details only.";
   setPhoneDataUnavailable("Connect a phone to load details");
-  disablePowerProfile("Connect an authorized Android phone through ADB to change power mode.");
 }
 
 function setPhoneDataUnavailable(message) {
